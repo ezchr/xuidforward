@@ -1,0 +1,14 @@
+{
+  "bds_version": "1.26.45.1",
+  "executable_size": 243724200,
+  "site_rva": "0x84ed3f6",
+  "helper_rva": "0x84edb50",
+  "expected_site_bytes": "E8 55 07 00 00 80 BC 24 80 00 00 00 00 0F 85 0C FF FF FF 48 8D 7C 24 40 E8 ED 6B 06 00 80 BC 24 70 01 00 00 01 0F 85 BD FB FF FF E9 FD FE FF FF",
+  "offset_xuid": 0,
+  "offset_xbox_live_name": 144,
+  "offset_engaged": 296,
+  "offset_string_size": 24,
+  "_what": "Same call site as the 1.26.51.1 profile, in the previous BDS build. Kept as the control: OniLink's published profile (executable_sha256 8ba803f2..., target_rva 139383798, target_call_destination_rva 139385680) matches these numbers exactly, which is what validated the derivation method.",
+  "_register_contract": "rbx = pointer to the optional result, r12 = LoginPacket, r14 = this, r15 = NetworkIdentifier.",
+  "_note": "The live server runs 1.26.51.1. This file is for validating tooling against a known-good answer."
+}
