@@ -29,9 +29,14 @@ struct FieldOffsets {
 struct Profile {
     std::string bds_version;           // informational
     std::uint64_t executable_size{0};  // byte size of bedrock_server this was derived from
-    std::uint64_t site_rva{0};         // the `call` we replace
-    std::string expected_site_bytes;   // raw bytes that must be present at site_rva
-    std::uint64_t helper_rva{0};       // call target we re-issue from the relay
+    std::uint64_t site_rva{0};         // the `call` we replace (0 = locate via site_signature)
+    std::string expected_site_bytes;   // raw bytes that must be present at site_rva (legacy exact match)
+    std::uint64_t helper_rva{0};       // call target we re-issue (0 = derive from the call at the site)
+    // site_signature, when set, locates the site by pattern instead of a fixed address: the site's
+    // opcodes with the build-specific relative operands wildcarded ("E8 ?? ?? ?? ?? ..."). It must
+    // match in exactly one place or the plugin refuses to patch. This lets one profile survive a
+    // BDS update that only shifts addresses. See resolve_site and signature.h.
+    std::string site_signature;
     FieldOffsets offsets;
 };
 
@@ -45,6 +50,15 @@ const Profile &builtin_profile();
 // Verify that a loaded image matches the profile: same executable size and the
 // expected bytes at the site. Fills `error` and returns false on any mismatch.
 bool verify_site(const Profile &profile, std::uintptr_t base, std::string &error);
+
+// Pin the profile's site to a concrete address in the loaded image. For a profile that carries a
+// site_signature this scans the executable segments for the (unique) match, sets site_rva, and,
+// when helper_rva is 0, derives it from the relative call at the site. For a profile with no
+// signature it falls back to verify_site (the fixed-address exact-bytes check). Fills `error` and
+// returns false - patching nothing - if the signature is missing, absent, or matches more than
+// once. `resolved_note` (optional) receives a short human-readable account of what was located.
+bool resolve_site(Profile &profile, std::uintptr_t base, std::string &error,
+                  std::string *resolved_note = nullptr);
 
 // Base address of the main executable (the BDS image) in this process.
 std::uintptr_t main_image_base();

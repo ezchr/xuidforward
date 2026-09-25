@@ -4,9 +4,9 @@ An [Endstone](https://github.com/EndstoneMC/endstone) plugin that makes a Bedroc
 Server keep the real XUID from a self-signed (offline) login, so players who reach the server
 through a proxy get their own persistent player record instead of a fresh, empty one every join.
 
-> **Built for BDS 1.26.51.1 (protocol 2193), Linux x86-64.** The native patch is pinned to that
-> exact build and refuses to install on any other. A different BDS version needs a new profile
-> (see [Status](#status)).
+> **Built for BDS 1.26.51.1 (protocol 2193), Linux x86-64.** The native patch locates its site by
+> signature, so it also installs on later builds that only shifted addresses; it refuses to patch
+> if it can't find the site uniquely. See [Status](#status).
 
 ## The setup this is for
 
@@ -42,11 +42,19 @@ The plugin has two halves:
    Endstone ships no C++ SDK artifact, which is why the native part is a standalone shim rather
    than a C++ plugin.
 
-The native patch is **evidence-gated**: it carries a per-build profile (exact executable size plus
-the exact bytes expected at the patch site) and refuses to patch anything that does not match, so
-a BDS update makes it fail closed rather than corrupt a running server. Profiles live in
-`plugin/profiles/`; `plugin/tools/verify.cpp` and `tools/elfscan.py` help build one for a new
-BDS version.
+The native patch is **evidence-gated**: it carries a profile describing the patch site and refuses
+to patch anything that does not match, so a bad match fails closed rather than corrupting a running
+server. A profile names the site one of two ways:
+
+- a **signature** — the site's opcodes with the build-specific relative operands wildcarded. At
+  startup the plugin scans BDS's executable for it and patches only if it matches in **exactly one**
+  place. Because it ignores the operands that a rebuild shifts, one profile keeps working across a
+  BDS update until Mojang actually changes the instructions at the site. This is the default.
+- a **fixed address** (`site_rva` + `expected_site_bytes`) — exact, but valid for one build only.
+
+Profiles live in `plugin/profiles/`; `plugin/tools/verify.cpp` locates the site (by signature or
+address) in a `bedrock_server` on disk without a running server, and `tools/elfscan.py` helps build
+a profile for a new version.
 
 ## What it does and doesn't trust
 
@@ -105,17 +113,22 @@ Needs `clang++-18` and libc++ dev headers. Then place the files and restart exac
 The BDS console on startup should show:
 
 ```
-[Xuidforward] profile self-check: profile valid: BDS 1.26.51.1
+[Xuidforward] profile self-check: profile valid: BDS 1.26.51.1 (signature -> site 0x..., helper 0x...)
 [Xuidforward] hook installed.
 ```
 
-If instead it logs that the profile does not match, your BDS build differs from the one the
-`.so`/profile targets — the hook stays off and BDS keeps its stock behaviour.
+If instead it logs that the signature was not found or matched more than once, the login code in
+your BDS build differs from what the profile targets — the hook stays off and BDS keeps its stock
+behaviour until you supply an updated profile.
 
 ## Status
 
-Runs against BDS 1.26.51.1 (protocol 2193). Every BDS update needs a new profile before the hook
-will install.
+Built and validated against BDS 1.26.51.1 (protocol 2193). Thanks to signature location, a BDS
+update that only shifts addresses should keep working with the shipped profile; you only need a new
+profile if the plugin logs that the signature was not found (Mojang changed the login code) or
+matched more than once. The struct field offsets are still version-specific — if those move, the
+hook simply declines to write rather than writing to the wrong place, so it stays safe until the
+profile's offsets are updated.
 
 ## License
 

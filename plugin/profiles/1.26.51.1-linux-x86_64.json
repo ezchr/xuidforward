@@ -4,6 +4,7 @@
   "site_rva": "0x8919b59",
   "helper_rva": "0x891a2b0",
   "expected_site_bytes": "E8 52 07 00 00 80 BC 24 80 00 00 00 00 0F 85 0C FF FF FF 48 8D 7C 24 40 E8 6A D1 EC FB 80 BC 24 70 01 00 00 01 0F 85 BD FB FF FF E9 FD FE FF FF",
+  "site_signature": "E8 ?? ?? ?? ?? 80 BC 24 80 00 00 00 00 0F 85 ?? ?? ?? ?? 48 8D 7C 24 40 E8 ?? ?? ?? ?? 80 BC 24 70 01 00 00 01 0F 85 ?? ?? ?? ?? E9 ?? ?? ?? ??",
   "offset_xuid": 0,
   "offset_xbox_live_name": 144,
   "offset_engaged": 296,
