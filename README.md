@@ -64,4 +64,8 @@ install the wheel into your Endstone environment.
 ## Status
 
 Runs against BDS 1.26.51.1 (protocol 2193). Every BDS update needs a new profile before the hook
-will install. No license is set yet — add one if you intend others to reuse it.
+will install.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
