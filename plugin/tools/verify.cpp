@@ -21,11 +21,46 @@
 
 #include "../src/hook.h"
 #include "../src/profile.h"
+#include "../src/signature.h"
 
 namespace {
 
 struct Image {
     std::vector<std::uint8_t> data;
+
+    // Scan the executable PT_LOAD segments for a signature, the same way the plugin scans the
+    // loaded image at runtime. Returns the number of matches and, via first_rva, the RVA of the
+    // first - a caller wanting to patch requires exactly one.
+    std::size_t scan_signature(const xuidforward::Signature &sig, std::uint64_t &first_rva) const
+    {
+        first_rva = 0;
+        if (data.size() < sizeof(Elf64_Ehdr)) {
+            return 0;
+        }
+        const auto *ehdr = reinterpret_cast<const Elf64_Ehdr *>(data.data());
+        std::size_t total = 0;
+        for (int i = 0; i < ehdr->e_phnum; ++i) {
+            const auto *phdr = reinterpret_cast<const Elf64_Phdr *>(
+                data.data() + ehdr->e_phoff + static_cast<std::size_t>(i) * ehdr->e_phentsize);
+            if (phdr->p_type != PT_LOAD || (phdr->p_flags & PF_X) == 0 || phdr->p_filesz == 0) {
+                continue;
+            }
+            if (phdr->p_offset + phdr->p_filesz > data.size()) {
+                continue;
+            }
+            std::size_t first = 0;
+            const std::size_t n = xuidforward::signature_scan(
+                data.data() + phdr->p_offset, static_cast<std::size_t>(phdr->p_filesz), sig, first);
+            if (n > 0 && total == 0) {
+                first_rva = phdr->p_vaddr + first;
+            }
+            total += n;
+            if (total > 1) {
+                break;
+            }
+        }
+        return total;
+    }
 
     // Map an RVA (what the profile stores) to a file offset using the ELF
     // program headers - the same mapping tools/elfscan.py performs.
@@ -118,6 +153,38 @@ int main(int argc, char **argv)
     }
 
     bool ok = true;
+
+    // If the profile carries a signature, locate the site by pattern the way the plugin does at
+    // runtime, and report it. This is what lets a profile outlive a BDS update that only shifts
+    // addresses, so it's checked first and drives the site_rva used below.
+    if (!profile.site_signature.empty()) {
+        xuidforward::Signature sig;
+        if (!xuidforward::parse_signature(profile.site_signature, sig)) {
+            std::cout << "signature     : MALFORMED\n";
+            ok = false;
+        }
+        else {
+            std::uint64_t found_rva = 0;
+            const std::size_t n = image.scan_signature(sig, found_rva);
+            if (n == 1) {
+                std::int32_t disp = 0;
+                std::memcpy(&disp, image.at(found_rva) + 1, sizeof(disp));
+                const auto helper = static_cast<std::uint64_t>(static_cast<std::int64_t>(found_rva + 5) + disp);
+                std::cout << "signature     : unique match at rva " << found_rva
+                          << " (helper " << helper << ")\n";
+                if (profile.site_rva != 0 && profile.site_rva != found_rva) {
+                    std::cout << "  note        : differs from profile site_rva " << profile.site_rva << "\n";
+                }
+                profile.site_rva = found_rva;
+                profile.helper_rva = helper;
+            }
+            else {
+                std::cout << "signature     : " << (n == 0 ? "NOT FOUND" : "AMBIGUOUS (>1 match)") << "\n";
+                ok = false;
+            }
+        }
+    }
+
     if (profile.executable_size != 0 && profile.executable_size != image.data.size()) {
         std::cout << "size match    : NO (profile says " << profile.executable_size << ")\n";
         ok = false;

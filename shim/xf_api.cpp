@@ -104,9 +104,10 @@ int xf_self_check(const char *profile_path, char *out, int out_size)
     }
     const auto base = xuidforward::main_image_base();
     std::string error;
-    const bool ok = base != 0 && xuidforward::verify_site(profile, base, error);
+    std::string note;
+    const bool ok = base != 0 && xuidforward::resolve_site(profile, base, error, &note);
     if (out != nullptr && out_size > 0) {
-        const std::string message = ok ? ("profile valid: BDS " + profile.bds_version)
+        const std::string message = ok ? ("profile valid: BDS " + profile.bds_version + " (" + note + ")")
                                        : (base == 0 ? std::string("no BDS image base") : error);
         std::snprintf(out, static_cast<std::size_t>(out_size), "%s", message.c_str());
     }

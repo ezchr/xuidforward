@@ -279,8 +279,15 @@ bool SiteHook::install(std::uintptr_t base, const Profile &profile, InjectFn inj
         return false;
     }
 
-    const auto site = base + profile.site_rva;
-    const auto helper = base + profile.helper_rva;
+    // Locate (and verify) the site first: a signature profile has no site_rva until this runs, so
+    // everything below - including the re-install shortcut - must use the resolved copy.
+    Profile resolved = profile;
+    if (!resolve_site(resolved, base, error)) {
+        return false;
+    }
+
+    const auto site = base + resolved.site_rva;
+    const auto helper = base + resolved.helper_rva;
 
     // remove() intentionally leaves the patch in place and the relay page mapped, so a
     // later install in the same process is looking at bytes it wrote itself. Recognise
@@ -292,10 +299,6 @@ bool SiteHook::install(std::uintptr_t base, const Profile &profile, InjectFn inj
         site_ = site;
         installed_ = true;
         return true;
-    }
-
-    if (!verify_site(profile, base, error)) {
-        return false;
     }
 
     relay_code_ = build_relay(helper, reinterpret_cast<std::uintptr_t>(inject));
