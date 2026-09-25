@@ -72,15 +72,45 @@ A modified client connecting directly can still pick any display name it likes �
 to `online-mode=false`, not something this plugin adds — but it gets no XUID, so it cannot inherit
 another player's saved data or permissions, which BDS keys on the XUID.
 
-## Building
+## Installing
+
+Two files end up on your server: the Python plugin wheel and the native `libxuidforward.so`.
+Everything below runs on the Linux BDS machine — the `.so` is Linux x86-64 and can't be built or
+run on Windows.
+
+### Option A — prebuilt release (BDS 1.26.51.1 only)
+
+The [latest release](../../releases/latest) has both files prebuilt, plus `INSTALL.txt` and
+`SHA256SUMS`. If your BDS is exactly 1.26.51.1, Linux x86-64, use these — no compiler needed.
+
+1. Put `endstone_xuidforward-<version>-py3-none-any.whl` into your server's `plugins/` folder
+   (the same folder Endstone already loads plugins from).
+2. Create `plugins/xuidforward/` and put `libxuidforward.so` inside it.
+3. Restart BDS **fully** — not `/reload`; the native patch can't reinstall into a running server.
+
+### Option B — build from source (any target, and the only way for a different BDS build)
 
 ```sh
-scripts/build-shim.sh          # builds libxuidforward.so, runs the smoke + parser tests
+scripts/build-shim.sh                                        # builds build/libxuidforward.so, runs the tests
 python -m pip wheel --no-deps -w build/wheel python_plugin   # builds the plugin wheel
 ```
 
-Then drop `libxuidforward.so` and a matching `profile.json` into the plugin's data folder and
-install the wheel into your Endstone environment.
+Needs `clang++-18` and libc++ dev headers. Then place the files and restart exactly as in steps
+1–3 above. For a BDS build other than 1.26.51.1 you also need a matching profile: derive one (see
+`plugin/tools/verify.cpp` and `tools/elfscan.py`), drop it into `plugins/xuidforward/` as
+`profile.json`. For 1.26.51.1 the profile is built into the shim, so no `profile.json` is needed.
+
+### Checking it worked
+
+The BDS console on startup should show:
+
+```
+[Xuidforward] profile self-check: profile valid: BDS 1.26.51.1
+[Xuidforward] hook installed.
+```
+
+If instead it logs that the profile does not match, your BDS build differs from the one the
+`.so`/profile targets — the hook stays off and BDS keeps its stock behaviour.
 
 ## Status
 
