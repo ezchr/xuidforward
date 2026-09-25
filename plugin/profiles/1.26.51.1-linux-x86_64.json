@@ -1,0 +1,15 @@
+{
+  "bds_version": "1.26.51.1",
+  "executable_size": 256132752,
+  "site_rva": "0x8919b59",
+  "helper_rva": "0x891a2b0",
+  "expected_site_bytes": "E8 52 07 00 00 80 BC 24 80 00 00 00 00 0F 85 0C FF FF FF 48 8D 7C 24 40 E8 6A D1 EC FB 80 BC 24 70 01 00 00 01 0F 85 BD FB FF FF E9 FD FE FF FF",
+  "offset_xuid": 0,
+  "offset_xbox_live_name": 144,
+  "offset_engaged": 296,
+  "offset_string_size": 24,
+  "_what": "ServerNetworkHandler::_validateLoginPacket - the call that builds the optional<PlayerAuthenticationInfo> result which BDS then hands to _createNewPlayer, before player storage is selected.",
+  "_derived_by": "tools/elfscan.py + the OniLink 1.26.45.1 profile used as a control (see README.md, 'How the profile was derived').",
+  "_register_contract": "rbx = pointer to the optional result, r12 = LoginPacket, r14 = this, r15 = NetworkIdentifier.",
+  "_note": "Verify with: xuidforward-verify /path/to/bedrock_server profiles/1.26.51.1-linux-x86_64.json"
+}

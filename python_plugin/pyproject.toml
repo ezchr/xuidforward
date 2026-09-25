@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "endstone-xuidforward"
+version = "1.0.1"
+description = "Restores the real XUID on relayed (self-signed) Bedrock logins so a native BDS serves the player's own save data."
+requires-python = ">=3.10"
+
+[project.entry-points."endstone"]
+xuidforward = "endstone_xuidforward:XuidForward"
+
+[tool.hatch.build.targets.wheel]
+packages = ["endstone_xuidforward"]
