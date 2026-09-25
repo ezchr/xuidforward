@@ -4,6 +4,10 @@ An [Endstone](https://github.com/EndstoneMC/endstone) plugin that makes a Bedroc
 Server keep the real XUID from a self-signed (offline) login, so players who reach the server
 through a proxy get their own persistent player record instead of a fresh, empty one every join.
 
+> **Built for BDS 1.26.51.1 (protocol 2193), Linux x86-64.** The native patch is pinned to that
+> exact build and refuses to install on any other. A different BDS version needs a new profile
+> (see [Status](#status)).
+
 ## The setup this is for
 
 This plugin is only useful if you run a **proxy or relay in front of BDS** — something that
