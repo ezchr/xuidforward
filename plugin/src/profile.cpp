@@ -141,6 +141,31 @@ std::optional<Profile> load_profile(const std::string &path, std::string &error)
     profile.offsets.xbox_live_name = offset_of("offset_xbox_live_name", profile.offsets.xbox_live_name);
     profile.offsets.engaged = offset_of("offset_engaged", profile.offsets.engaged);
     profile.offsets.string_size = offset_of("offset_string_size", profile.offsets.string_size);
+
+    // The offsets index into BDS's PlayerAuthenticationInfo; the hook reads/writes std::strings
+    // at offset_xuid and offset_xbox_live_name and reads a bool at offset_engaged. A typo here
+    // would aim those accesses at the wrong bytes, so reject anything that cannot be a valid
+    // layout for this ABI before the profile is ever used to patch.
+    constexpr std::uint64_t kMaxStruct = 4096;  // a login-result struct far larger than reality
+    if (profile.offsets.string_size < 16 || profile.offsets.string_size > 64) {
+        error = "offset_string_size is not a plausible sizeof(std::string)";
+        return std::nullopt;
+    }
+    if ((profile.offsets.xuid % 8) != 0 || (profile.offsets.xbox_live_name % 8) != 0) {
+        error = "offset_xuid and offset_xbox_live_name must be 8-aligned (they hold std::strings)";
+        return std::nullopt;
+    }
+    if (profile.offsets.xuid == profile.offsets.xbox_live_name) {
+        error = "offset_xuid and offset_xbox_live_name must differ";
+        return std::nullopt;
+    }
+    if (profile.offsets.engaged >= kMaxStruct ||
+        profile.offsets.xuid + profile.offsets.string_size > kMaxStruct ||
+        profile.offsets.xbox_live_name + profile.offsets.string_size > kMaxStruct) {
+        error = "a profile offset is outside the plausible struct size - refusing it";
+        return std::nullopt;
+    }
+
     const bool has_signature_way = !profile.site_signature.empty();
     const bool has_fixed_way = profile.site_rva != 0 && !profile.expected_site_bytes.empty();
     if (!has_signature_way && !has_fixed_way) {

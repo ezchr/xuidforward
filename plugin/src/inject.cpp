@@ -1,5 +1,6 @@
 #include "inject.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -100,6 +101,22 @@ void inject_entry(void *optional_result, void *login_packet, void *network_handl
     }
 
     auto *object = static_cast<unsigned char *>(optional_result);
+
+    // Validate the whole struct region is mapped before the first raw read. The string
+    // accessors below each re-check their own field, but object[engaged] is a bare read:
+    // if a BDS update ever changed the register contract at the hook site so this pointer
+    // were not the auth result, that bare read could fault inside the login path and take
+    // the server down. Refuse (fail closed) if the region is not fully readable.
+    const std::uint64_t span = std::max({config.profile.offsets.engaged + 1,
+                                         config.profile.offsets.xbox_live_name + config.profile.offsets.string_size,
+                                         config.profile.offsets.xuid + config.profile.offsets.string_size});
+    if (!AddressSpace::readable(object, static_cast<std::size_t>(span))) {
+        g_write_refused.fetch_add(1, std::memory_order_relaxed);
+        if (config.dry_run) {
+            hook_log("auth-result object is not fully mapped at the profile's offsets - left untouched");
+        }
+        return;
+    }
 
     // The optional must be engaged: BDS only consumes the result when it is.
     if (object[config.profile.offsets.engaged] == 0) {

@@ -35,8 +35,9 @@ namespace xuidforward {
 // /proc/self/maps is re-read per call: this only runs during a login, and being
 // current matters more than being fast when the alternative is a segfault.
 class AddressSpace {
-public:
-    static bool readable(const void *address, std::size_t size)
+    // Is [address, address + size) inside a single mapping with the required permissions?
+    // need_write also requires the 'w' bit (perms are "rwxp" starting at space + 1).
+    static bool check_mapping(const void *address, std::size_t size, bool need_write)
     {
         if (address == nullptr || size == 0) {
             return false;
@@ -60,6 +61,9 @@ public:
             if (space + 1 >= line.size() || line[space + 1] != 'r') {
                 continue;  // mapping is not readable
             }
+            if (need_write && (space + 2 >= line.size() || line[space + 2] != 'w')) {
+                continue;  // mapping is not writable
+            }
             try {
                 const auto from = std::stoull(line.substr(0, dash), nullptr, 16);
                 const auto to = std::stoull(line.substr(dash + 1, space - dash - 1), nullptr, 16);
@@ -72,6 +76,19 @@ public:
             }
         }
         return false;
+    }
+
+public:
+    static bool readable(const void *address, std::size_t size)
+    {
+        return check_mapping(address, size, false);
+    }
+
+    // Like readable(), but the mapping must also be writable. assign() reads the field back
+    // after writing, so a writable mapping is required to be readable too (it always is here).
+    static bool writable(const void *address, std::size_t size)
+    {
+        return check_mapping(address, size, true);
     }
 
     // Read a pointer-sized value out of a guest object, then check that what it
@@ -217,7 +234,11 @@ struct StringLayout {
         if (!valid || object == nullptr || (reinterpret_cast<std::uintptr_t>(object) & 0x7) != 0) {
             return false;
         }
-        if (!AddressSpace::readable(object, sizeof(std::uint64_t))) {
+        // Validate the whole 24-byte string object, not just the first 8: the discriminator
+        // lives at flag_offset (up to 23) and the long-form size at long_size (up to 16..23),
+        // so an object whose first 8 bytes are mapped but whose tail is not would fault below.
+        // is_empty() and assign() already validate 24; this keeps read() consistent with them.
+        if (!AddressSpace::readable(object, 24)) {
             return false;
         }
         const auto *bytes = static_cast<const unsigned char *>(object);
@@ -271,7 +292,9 @@ struct StringLayout {
         if (!valid || object == nullptr || (reinterpret_cast<std::uintptr_t>(object) & 0x7) != 0) {
             return false;
         }
-        if (!AddressSpace::readable(object, 24)) {
+        // Require the mapping to be writable, not merely readable: writing into a read-only
+        // page would fault inside BDS's login path. (readable() would have passed a code page.)
+        if (!AddressSpace::writable(object, 24)) {
             return false;
         }
         const auto *bytes = static_cast<const unsigned char *>(object);
@@ -287,6 +310,13 @@ struct StringLayout {
         std::memcpy(target + short_data, value.data(), value.size());
         std::memset(target + short_data + value.size(), 0, 1);
         target[flag_offset] = static_cast<unsigned char>(value.size() << 1);
+        // Post-write tripwire: read the field back and confirm it decodes to exactly what we
+        // wrote. If a wrong offset ever put us on the wrong object, the read-back won't match,
+        // so a silent corruption surfaces as a caught, logged refusal instead.
+        std::string check;
+        if (!read(object, check) || check != value) {
+            return false;
+        }
         return true;
     }
 };

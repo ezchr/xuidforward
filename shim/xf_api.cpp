@@ -44,7 +44,7 @@ extern "C" {
 
 const char *xf_version(void)
 {
-    return "xuidforward-shim 1.0.1";
+    return "xuidforward-shim 1.0.3";
 }
 
 const char *xf_register_contract(void)
@@ -190,6 +190,30 @@ int xf_stage(const char *name, const char *xuid, const char *self_signed_id)
     if (name == nullptr || xuid == nullptr || name[0] == '\0' || xuid[0] == '\0') {
         return 1;
     }
+    // Names and XUIDs are written verbatim into the console, which is this mechanism's only
+    // audit trail. Reject control characters (a crafted name with \n or \r could forge a
+    // "restored xuid=..." log line) and anything implausibly long, before it is ever staged.
+    const auto printable_bounded = [](const char *s, std::size_t max) {
+        std::size_t n = 0;
+        for (const char *p = s; *p != '\0'; ++p, ++n) {
+            if (n >= max) {
+                return false;
+            }
+            const auto c = static_cast<unsigned char>(*p);
+            if (c < 0x20 || c > 0x7E) {
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!printable_bounded(name, 32)) {
+        set_error("staged name is too long or contains control characters");
+        return 1;
+    }
+    if (!printable_bounded(xuid, 20)) {
+        set_error("staged xuid is too long or contains control characters");
+        return 1;
+    }
     const std::string self_id = self_signed_id == nullptr ? "" : self_signed_id;
     if (xuidforward::inject_config().require_self_signed_id_match) {
         if (self_id.empty()) {
@@ -217,6 +241,18 @@ int xf_stage(const char *name, const char *xuid, const char *self_signed_id)
 int xf_clear_stage(void)
 {
     xuidforward::identity_stage().clear();
+    return 0;
+}
+
+// Drop only the pending identity staged under `name`. Preferred over xf_clear_stage() when the
+// plugin could read the outside login's name: it removes exactly the entry that login could pick
+// up, so a burst of outside logins for unrelated names can no longer wipe a legitimate relayed
+// player's staged identity out from under them. Returns 0 always (absence is not an error).
+int xf_clear_stage_name(const char *name)
+{
+    if (name != nullptr && name[0] != '\0') {
+        xuidforward::identity_stage().clear_name(name);
+    }
     return 0;
 }
 

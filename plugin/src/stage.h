@@ -56,6 +56,14 @@ public:
         entries_.clear();
     }
 
+    // Drop only the entry staged under `name`. Lets an outside login clear exactly the identity
+    // it could otherwise consume, without wiping unrelated relayed players' pending identities.
+    void clear_name(const std::string &name)
+    {
+        std::lock_guard lock(mutex_);
+        entries_.erase(normalize(name));
+    }
+
     // Look without consuming - for diagnostics.
     std::optional<StagedIdentity> peek(const std::string &name)
     {

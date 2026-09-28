@@ -24,12 +24,6 @@ claims are internally consistent. The real authentication boundary is the relay'
 front door plus the fact that BDS's login handler is not reachable from outside; the source check
 makes the plugin enforce that rather than assume it.
 
-`SelfSignedId == uuid5(namespace_uuid, XUID)` is a *consistency* check, NOT an authentication
-control. Both the namespace and the derivation are public (see the relay's
-proxy/self_signed_id.go), so anyone who can deliver a self-signed login can compute a matching
-value. It stays because it catches a relay whose persistence fix is off, or a login that did not
-come from this relay - not because it proves anything.
-
 Residual assumption: a *local* process could still reach the handler and forge a login. On a box
 where that process would have to be root-equivalent to exist, that is accepted. If the relay ever
 moves off this machine, replace the loopback rule with an explicit source allowlist (or a signed
@@ -193,10 +187,12 @@ class XuidForward(Plugin):
             source_host, source_port = "", 0
 
         if not self._source_allowed(source_host):
-            # BDS is about to process this login, and the hook matches staged identities by
-            # name. Drop everything pending first, so a login from outside can never be handed
-            # an identity staged for a relayed player - e.g. one whose join failed halfway.
-            self._shim.xf_clear_stage()
+            # BDS is about to process this login, and the hook matches staged identities by the
+            # name BDS builds. Clear the entry this outside login could pick up, so it can never
+            # be handed an identity staged for a relayed player - e.g. one whose join failed
+            # halfway. Clearing only the name(s) this login resolves to means a burst of unrelated
+            # outside logins can no longer wipe a legitimate relayed player's staged identity.
+            self._clear_outside_login(event.payload)
             self._log_rejected_source(source_host, source_port, event.payload)
             return
 
@@ -317,6 +313,28 @@ class XuidForward(Plugin):
             return True
         return host.startswith("127.") or host in ("::1", "localhost", "0:0:0:0:0:0:0:1")
 
+    def _clear_outside_login(self, payload) -> None:
+        # Remove exactly the staged entry an outside login could consume. BDS builds the auth
+        # result's name from the login, so clear both names this login might resolve to (xname
+        # and ThirdPartyName). If the body can't be read, or the shim predates targeted clearing,
+        # fall back to clearing everything - the safe, if blunter, behaviour.
+        names = []
+        try:
+            parsed = parse_login_body(payload)
+            if parsed:
+                for key in ("xname", "third_party_name"):
+                    value = parsed.get(key)
+                    if isinstance(value, str) and value:
+                        names.append(value)
+        except Exception:
+            names = []
+        targeted = getattr(self._shim, "xf_clear_stage_name", None)
+        if names and targeted is not None:
+            for name in names:
+                targeted(name.encode())
+        else:
+            self._shim.xf_clear_stage()
+
     def _log_rejected_source(self, host: str, port: int, payload) -> None:
         # Rate limited: a login flood must not become a log flood.
         self._rejected_sources += 1
@@ -374,8 +392,10 @@ class XuidForward(Plugin):
             str(self.data_folder / "libxuidforward.so"),
             str(self.data_folder.parent / "libxuidforward.so"),
             "/root/bedrock/plugins/xuidforward/libxuidforward.so",
-            "/root/xuidfix/build/libxuidforward.so",
         ]
+        # Deliberately NOT falling back to a build tree (e.g. /root/xuidfix/build): a production
+        # server must never silently load a half-finished .so left over from a rebuild. Point
+        # "shim_path" in config.json at a build explicitly if that is really what you want.
         for candidate in candidates:
             try:
                 library = ctypes.CDLL(candidate)
@@ -387,6 +407,9 @@ class XuidForward(Plugin):
                 self.logger.error(f"{candidate} is an older shim without xf_clear_stage - not using it")
                 continue
             library.xf_clear_stage.restype = ctypes.c_int
+            if hasattr(library, "xf_clear_stage_name"):
+                library.xf_clear_stage_name.argtypes = [ctypes.c_char_p]
+                library.xf_clear_stage_name.restype = ctypes.c_int
             library.xf_version.restype = ctypes.c_char_p
             library.xf_last_error.restype = ctypes.c_char_p
             library.xf_register_contract.restype = ctypes.c_char_p
