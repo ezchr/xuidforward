@@ -129,6 +129,13 @@ std::optional<Profile> load_profile(const std::string &path, std::string &error)
         profile.site_rva = 0;
         profile.helper_rva = 0;
     }
+    if (const auto it = values.find("result_register"); it != values.end()) {
+        if (it->second != "rbx" && it->second != "rdi") {
+            error = "result_register must be \"rbx\" or \"rdi\"";
+            return std::nullopt;
+        }
+        profile.result_register = it->second;
+    }
     const auto offset_of = [&](const char *key, std::uint64_t fallback) {
         if (const auto it = values.find(key); it != values.end()) {
             if (const auto v = parse_u64(it->second)) {

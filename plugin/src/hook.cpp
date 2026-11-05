@@ -18,6 +18,7 @@ constexpr std::uint32_t kSavedBase = kFrame; // pushed registers, in push order
 constexpr std::uint32_t kSavedR15 = kSavedBase + 0x00;
 constexpr std::uint32_t kSavedR14 = kSavedBase + 0x08;
 constexpr std::uint32_t kSavedR12 = kSavedBase + 0x18;
+constexpr std::uint32_t kSavedRdi = kSavedBase + 0x40;
 constexpr std::uint32_t kSavedRbx = kSavedBase + 0x58;
 constexpr std::uint32_t kSavedRax = kSavedBase + 0x70;
 
@@ -204,11 +205,12 @@ bool make_executable(void *address, std::size_t length)
 
 const char *relay_register_contract()
 {
-    return "rbx = pointer to the optional<PlayerAuthenticationInfo> result, "
-           "r12 = LoginPacket, r14 = this (ServerNetworkHandler), r15 = NetworkIdentifier";
+    return "the PlayerAuthenticationInfo the hooked call built is handed to the plugin "
+           "(profile result_register: rbx = the optional result, rdi = the copy's destination)";
 }
 
-std::vector<std::uint8_t> build_relay(std::uintptr_t helper_address, std::uintptr_t inject_address)
+std::vector<std::uint8_t> build_relay(std::uintptr_t helper_address, std::uintptr_t inject_address,
+                                      bool result_in_rdi)
 {
     Emitter e;
 
@@ -240,8 +242,9 @@ std::vector<std::uint8_t> build_relay(std::uintptr_t helper_address, std::uintpt
     emit_store_rsp_reg(e, kRax, kSavedRax);
 
     // 4. Hand the guest registers to the plugin:
-    //    inject(rbx, r12, r14, r15)
-    emit_load_reg_rsp(e, kRdi, kSavedRbx);
+    //    inject(rbx, r12, r14, r15) - or, for a profile whose result is the object a copy
+    //    constructor built, the destination the caller passed in rdi (saved before the call).
+    emit_load_reg_rsp(e, kRdi, result_in_rdi ? kSavedRdi : kSavedRbx);
     emit_load_reg_rsp(e, kRsi, kSavedR12);
     emit_load_reg_rsp(e, kRdx, kSavedR14);
     emit_load_reg_rsp(e, kRcx, kSavedR15);
@@ -293,7 +296,8 @@ bool SiteHook::install(std::uintptr_t base, const Profile &profile, InjectFn inj
     // later install in the same process is looking at bytes it wrote itself. Recognise
     // that case and just re-point at the existing relay instead of patching twice.
     if (g_installed.site == site && g_installed.relay != 0) {
-        relay_code_ = build_relay(helper, reinterpret_cast<std::uintptr_t>(inject));
+        relay_code_ = build_relay(helper, reinterpret_cast<std::uintptr_t>(inject),
+                                  resolved.result_register == "rdi");
         relay_ = g_installed.relay;
         relay_size_ = g_installed.size;
         site_ = site;
@@ -301,7 +305,8 @@ bool SiteHook::install(std::uintptr_t base, const Profile &profile, InjectFn inj
         return true;
     }
 
-    relay_code_ = build_relay(helper, reinterpret_cast<std::uintptr_t>(inject));
+    relay_code_ = build_relay(helper, reinterpret_cast<std::uintptr_t>(inject),
+                              resolved.result_register == "rdi");
 
     const std::size_t page = static_cast<std::size_t>(sysconf(_SC_PAGESIZE));
     relay_size_ = (relay_code_.size() + page - 1) & ~(page - 1);

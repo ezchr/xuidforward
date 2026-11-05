@@ -107,7 +107,9 @@ void inject_entry(void *optional_result, void *login_packet, void *network_handl
     // if a BDS update ever changed the register contract at the hook site so this pointer
     // were not the auth result, that bare read could fault inside the login path and take
     // the server down. Refuse (fail closed) if the region is not fully readable.
-    const std::uint64_t span = std::max({config.profile.offsets.engaged + 1,
+    // A plain PlayerAuthenticationInfo (result_register "rdi") has no engaged flag to read.
+    const bool plain = config.profile.result_register == "rdi";
+    const std::uint64_t span = std::max({plain ? 0 : config.profile.offsets.engaged + 1,
                                          config.profile.offsets.xbox_live_name + config.profile.offsets.string_size,
                                          config.profile.offsets.xuid + config.profile.offsets.string_size});
     if (!AddressSpace::readable(object, static_cast<std::size_t>(span))) {
@@ -119,7 +121,7 @@ void inject_entry(void *optional_result, void *login_packet, void *network_handl
     }
 
     // The optional must be engaged: BDS only consumes the result when it is.
-    if (object[config.profile.offsets.engaged] == 0) {
+    if (!plain && object[config.profile.offsets.engaged] == 0) {
         g_not_engaged.fetch_add(1, std::memory_order_relaxed);
         return;
     }

@@ -4,9 +4,10 @@ An [Endstone](https://github.com/EndstoneMC/endstone) plugin that makes a Bedroc
 Server keep the real XUID from a self-signed (offline) login, so players who reach the server
 through a proxy get their own persistent player record instead of a fresh, empty one every join.
 
-> **Built for BDS 1.26.51.1 (protocol 2193), Linux x86-64.** The native patch locates its site by
-> signature, so it also installs on later builds that only shifted addresses; it refuses to patch
-> if it can't find the site uniquely. See [Status](#status).
+> **Supports BDS 1.26.60.6 (protocol 2225, Endstone 0.11.15) and 1.26.51.1 (protocol 2193),
+> Linux x86-64.** The plugin picks the profile that matches your BDS build by itself. It locates its
+> patch site by signature, so it also installs on later builds that only shifted addresses; it
+> refuses to patch if it can't find the site uniquely. See [Status](#status).
 
 ## The setup this is for
 
@@ -86,10 +87,14 @@ Two files end up on your server: the Python plugin wheel and the native `libxuid
 Everything below runs on the Linux BDS machine — the `.so` is Linux x86-64 and can't be built or
 run on Windows.
 
-### Option A — prebuilt release (BDS 1.26.51.1 only)
+### Option A — prebuilt release (BDS 1.26.60.6 or 1.26.51.1)
 
 The [latest release](../../releases/latest) has both files prebuilt, plus `INSTALL.txt` and
-`SHA256SUMS`. If your BDS is exactly 1.26.51.1, Linux x86-64, use these — no compiler needed.
+`SHA256SUMS`. If your BDS is 1.26.60.6 or 1.26.51.1, Linux x86-64, use these — no compiler needed.
+The profiles for both builds ship inside the wheel, so no `profile.json` is needed.
+
+The `.so` links against libc++. If it doesn't load (for example in the `endstone/endstone` Docker
+image, where `ldd` reports them missing), install `libc++1`, `libc++abi1` and `libunwind-14`.
 
 1. Put `endstone_xuidforward-<version>-py3-none-any.whl` into your server's `plugins/` folder
    (the same folder Endstone already loads plugins from).
@@ -104,18 +109,21 @@ python -m pip wheel --no-deps -w build/wheel python_plugin   # builds the plugin
 ```
 
 Needs `clang++-18` and libc++ dev headers. Then place the files and restart exactly as in steps
-1–3 above. For a BDS build other than 1.26.51.1 you also need a matching profile: derive one (see
-`plugin/tools/verify.cpp` and `tools/elfscan.py`), drop it into `plugins/xuidforward/` as
-`profile.json`. For 1.26.51.1 the profile is built into the shim, so no `profile.json` is needed.
+1–3 above. For a BDS build other than the supported ones you also need a matching profile: derive
+one (see `plugin/tools/verify.cpp` and `tools/elfscan.py`), drop it into `plugins/xuidforward/` as
+`profile.json`. A `profile.json` there always takes precedence over the bundled profiles.
 
 ### Checking it worked
 
 The BDS console on startup should show:
 
 ```
-[Xuidforward] profile self-check: profile valid: BDS 1.26.51.1 (signature -> site 0x..., helper 0x...)
+[Xuidforward] profile self-check (.../profiles/1.26.60.6-linux-x86_64.json): profile valid: BDS 1.26.60.6 (signature -> site 0x..., helper 0x...)
 [Xuidforward] hook installed.
 ```
+
+Profiles that don't match your build are logged as not found before the matching one; that's
+expected.
 
 If instead it logs that the signature was not found or matched more than once, the login code in
 your BDS build differs from what the profile targets — the hook stays off and BDS keeps its stock
@@ -123,7 +131,11 @@ behaviour until you supply an updated profile.
 
 ## Status
 
-Built and validated against BDS 1.26.51.1 (protocol 2193). Thanks to signature location, a BDS
+Validated against BDS 1.26.60.6 (protocol 2225, Endstone 0.11.15) and 1.26.51.1 (protocol 2193):
+a relayed self-signed login registers under the player's real XUID and their data persists across
+rejoins. In 1.26.60.6 Mojang merged the old login-validation step into
+`ServerNetworkHandler::_processValidatedLoginPacket`, so its profile hooks the
+`PlayerAuthenticationInfo` copy there (`"result_register": "rdi"`). Thanks to signature location, a BDS
 update that only shifts addresses should keep working with the shipped profile; you only need a new
 profile if the plugin logs that the signature was not found (Mojang changed the login code) or
 matched more than once. The struct field offsets are still version-specific — if those move, the

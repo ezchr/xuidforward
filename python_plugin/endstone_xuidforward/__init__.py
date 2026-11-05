@@ -128,14 +128,27 @@ class XuidForward(Plugin):
 
         profile_path = self._config["profile"] or str(self.data_folder / "profile.json")
         if profile_path and not Path(profile_path).exists():
-            self.logger.info(f"no profile at {profile_path} - using the shim's built-in profile")
             profile_path = ""
-        profile = profile_path
         buffer = ctypes.create_string_buffer(512)
-        rc = self._shim.xf_self_check(profile.encode(), buffer, len(buffer))
-        self.logger.info(f"profile self-check: {buffer.value.decode()} (rc={rc})")
-        if rc != 0:
-            self.logger.error("profile does not match this BDS build - refusing to patch anything")
+        if profile_path:
+            # A profile the operator chose: that one or nothing.
+            candidates = [profile_path]
+        else:
+            # None chosen: the shim's built-in profile, then each profile shipped with the plugin,
+            # for the BDS builds it supports. The self-check only reads the BDS image, so trying
+            # them is safe; the first that matches this build is used.
+            bundled = sorted(Path(__file__).parent.joinpath("profiles").glob("*.json"))
+            candidates = [""] + [str(p) for p in bundled]
+        profile = None
+        for candidate in candidates:
+            rc = self._shim.xf_self_check(candidate.encode(), buffer, len(buffer))
+            label = candidate or "built-in profile"
+            self.logger.info(f"profile self-check ({label}): {buffer.value.decode()} (rc={rc})")
+            if rc == 0:
+                profile = candidate
+                break
+        if profile is None:
+            self.logger.error("no profile matches this BDS build - refusing to patch anything")
             return
 
         rc = self._shim.xf_install(

@@ -38,6 +38,12 @@ struct Profile {
     // BDS update that only shifts addresses. See resolve_site and signature.h.
     std::string site_signature;
     FieldOffsets offsets;
+    // Where the auth info is when the re-issued call returns. "rbx" (the default, BDS 1.26.4x/5x):
+    // rbx points at the optional<PlayerAuthenticationInfo> the call filled, checked through
+    // offsets.engaged. "rdi" (BDS 1.26.60): the site is the PlayerAuthenticationInfo copy
+    // constructor, and the object it built is at the destination the caller passed in rdi - a
+    // plain PlayerAuthenticationInfo with no engaged flag (offsets.engaged is not used).
+    std::string result_register{"rbx"};
 };
 
 // Load a profile JSON file. Returns std::nullopt and fills `error` on failure.

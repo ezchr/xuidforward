@@ -59,7 +59,8 @@ private:
 };
 
 // Builds the relay machine code (exposed for the self-test command).
-std::vector<std::uint8_t> build_relay(std::uintptr_t helper_address, std::uintptr_t inject_address);
+std::vector<std::uint8_t> build_relay(std::uintptr_t helper_address, std::uintptr_t inject_address,
+                                      bool result_in_rdi = false);
 
 // Human-readable register contract read at the hook site (documentation/logs).
 const char *relay_register_contract();

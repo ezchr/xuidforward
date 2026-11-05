@@ -44,7 +44,7 @@ extern "C" {
 
 const char *xf_version(void)
 {
-    return "xuidforward-shim 1.0.3";
+    return "xuidforward-shim 1.0.4";
 }
 
 const char *xf_register_contract(void)

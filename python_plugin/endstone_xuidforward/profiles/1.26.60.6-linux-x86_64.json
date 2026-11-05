@@ -1,0 +1,17 @@
+{
+  "bds_version": "1.26.60.6",
+  "executable_size": 265500280,
+  "site_signature": "E8 ?? ?? ?? ?? 48 8D 9C 24 ?? ?? 00 00 C6 84 24 ?? ?? 00 00 00 C6 84 24 ?? ?? 00 00 00 41 80 7C 24 60 01 75 13 48 89 DF 4C 89 E6 E8 ?? ?? ?? ??",
+  "expected_site_bytes": "E8 C5 44 74 FE 48 8D 9C 24 E8 02 00 00 C6 84 24 E8 02 00 00 00 C6 84 24 48 03 00 00 00 41 80 7C 24 60 01 75 13 48 89 DF 4C 89 E6 E8 8A E0 1D FE",
+  "site_rva": "0x8cc3326",
+  "helper_rva": "0x74077f0",
+  "offset_xuid": 0,
+  "offset_xbox_live_name": 144,
+  "offset_engaged": 296,
+  "offset_string_size": 24,
+  "_what": "ServerNetworkHandler::_processValidatedLoginPacket - the call at 0x8cc3326 that copy-constructs the PlayerAuthenticationInfo (helper 0x74077f0) which BDS then hands to _createNewPlayer, before player storage is selected. In 1.26.60.6 Mojang merged the old _validateLoginPacket into this path; _processValidatedLoginPacket survives from 1.26.51.1 with an instruction-identical head (memcpy 0xAC auth struct, cmpb [r12+0x60], auth copy ctor), so the PlayerAuthenticationInfo layout is unchanged. The site is the copy constructor, so the hook reads the object it built at the caller-passed destination (rdi), a plain PlayerAuthenticationInfo with no engaged flag.",
+  "_register_contract": "rbx = PlayerAuthenticationInfo& (source of the copy, rsi at the call site), r12 = optional<MessToken>&, rbp = this (ServerNetworkHandler), r13 = NetworkIdentifier, r14 = shared_ptr<LoginPacket>.",
+  "_derived_by": "elfscan-style string-anchored RE against the 1.26.60.6 Linux binary (build 52576b75), cross-checked field-for-field against the 1.26.51.1 _processValidatedLoginPacket and its PlayerAuthenticationInfo copy ctor. Signature is unique (1 match) over the executable segments; the call's rel32 derives the helper 0x74077f0.",
+  "_note": "Verify with: xuidforward-verify /path/to/bedrock_server profiles/1.26.60.6-linux-x86_64.json",
+  "result_register": "rdi"
+}
