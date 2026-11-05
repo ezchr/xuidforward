@@ -8,6 +8,11 @@ through a proxy get their own persistent player record instead of a fresh, empty
 > Linux x86-64.** The plugin picks the profile that matches your BDS build by itself. It locates its
 > patch site by signature, so it also installs on later builds that only shifted addresses; it
 > refuses to patch if it can't find the site uniquely. See [Status](#status).
+>
+> **New in 1.0.5: the proxy can run on a different machine from BDS.** With
+> [Beacon Proxy](https://github.com/ezchr/beacon-proxy)'s signed forwarding, xuidforward trusts a
+> login by its signature instead of by where it comes from. See
+> [Proxy on another machine](#proxy-on-another-machine).
 
 ## The setup this is for
 
@@ -62,10 +67,12 @@ a profile for a new version.
 The plugin never invents an XUID. It only ever copies the real one the proxy already put in the
 login, and it guards that write so it can't be turned against a player:
 
-- **Local origin only.** An identity is staged only for a login that arrives from this machine —
-  i.e. from your proxy. A login coming straight off the network is never staged, and any pending
-  stage is dropped the moment one arrives, so a direct connection can never pick up an identity
-  meant for a proxied player.
+- **Signed by the proxy, or local origin.** With a forwarding secret set (see
+  [Proxy on another machine](#proxy-on-another-machine)), an identity is staged only for a login
+  carrying a valid claim signed with that secret, from wherever it arrives. Without one, it is
+  staged only for a login that arrives from this machine — i.e. from your proxy. Any other login is
+  never staged, and the stage it could pick up is dropped the moment it arrives, so a direct
+  connection can never pick up an identity meant for a proxied player.
 - **Empty field only.** The hook fills the XUID only when BDS left it blank (which is exactly the
   self-signed case). A login that already carries a real Xbox XUID is never overwritten.
 - **Verified name only.** Staging is keyed on the name from the login chain, never on a field the
@@ -128,6 +135,34 @@ expected.
 If instead it logs that the signature was not found or matched more than once, the login code in
 your BDS build differs from what the profile targets — the hook stays off and BDS keeps its stock
 behaviour until you supply an updated profile.
+
+## Proxy on another machine
+
+By default xuidforward only trusts logins that come from the BDS machine itself, so the proxy has
+to run there. To run the proxy elsewhere, use one that signs its logins: Beacon Proxy does, with
+`player-info-forwarding-mode = "beacon"` (its claim format is in Beacon's `docs/forwarding.md`).
+
+In `plugins/xuidforward/config.json`:
+
+```json
+"forwarding_secret_file": "/path/to/forwarding.secret",
+"beacon_server_name": "survival"
+```
+
+- `forwarding_secret_file`: a copy of Beacon's `forwarding.secret` (or put the secret itself in
+  `forwarding_secret`). Keep it private.
+- `beacon_server_name`: this server's name in Beacon's `[servers]`, so a login signed for another
+  server is refused. Empty accepts any.
+- `claim_window_seconds` (default 60): how old a signature may be. Keep both machines' clocks
+  correct (NTP).
+
+With a secret set, a login is staged only when its signature checks out, it names the same player
+as the login, it is recent, and it has not been used before. Where it comes from no longer matters,
+and a login without a valid signature is never staged, even from this machine. The startup log
+says `logins are trusted by their Beacon forwarding signature`.
+
+Still keep BDS reachable only by the proxy if you can: with `online-mode=false`, anyone who reaches
+it can join, just without anyone's XUID.
 
 ## Status
 

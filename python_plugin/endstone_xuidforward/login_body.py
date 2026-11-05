@@ -118,6 +118,17 @@ def _json_object_span(text: str, start: int = 0):
     return None
 
 
+def jwt_header(token) -> dict:
+    """The decoded header of a JWT, or {}."""
+    if not isinstance(token, str) or token.count(".") != 2:
+        return {}
+    try:
+        header = json.loads(b64url_decode(token.split(".")[0]))
+    except Exception:
+        return {}
+    return header if isinstance(header, dict) else {}
+
+
 def _identity_from_blobs(request_blob, client_data) -> dict:
     identity = {
         "auth_type": None,
@@ -125,6 +136,8 @@ def _identity_from_blobs(request_blob, client_data) -> dict:
         "xname": "",
         "third_party_name": "",
         "self_signed_id": "",
+        "beacon_claim": None,
+        "client_key": "",
     }
     try:
         request = json.loads(request_blob.decode("utf-8", "replace")) if request_blob else {}
@@ -142,6 +155,10 @@ def _identity_from_blobs(request_blob, client_data) -> dict:
     client_claims = jwt_claims(client_data)
     identity["third_party_name"] = str(client_claims.get(THIRD_PARTY_NAME_CLAIM, "") or "")
     identity["self_signed_id"] = str(client_claims.get(SELF_SIGNED_ID_CLAIM, "") or "")
+    # Beacon Proxy's signed forwarding claim, and the key the client data is signed with (the key
+    # the claim is bound to). See beacon_claim.py.
+    identity["beacon_claim"] = client_claims.get("BeaconForwarding")
+    identity["client_key"] = str(jwt_header(client_data).get("x5u", "") or "")
     return identity
 
 
@@ -162,6 +179,8 @@ def parse_login_body(payload) -> dict | None:
         "xname": "",
         "third_party_name": "",
         "self_signed_id": "",
+        "beacon_claim": None,
+        "client_key": "",
     }
     if len(body) < 6:
         return None

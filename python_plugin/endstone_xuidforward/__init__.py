@@ -42,6 +42,7 @@ from endstone.command import Command, CommandSender
 from endstone.event import PacketReceiveEvent, event_handler
 from endstone.plugin import Plugin
 
+from .beacon_claim import ClaimVerifier, read_secret
 from .login_body import is_self_signed, names_for_staging, parse_login_body
 
 LOGIN_PACKET_ID = 0x01
@@ -59,8 +60,16 @@ DEFAULT_CONFIG = {
     "authentication: the namespace and the uuid5 derivation are public, so anyone who can reach the "
     "handler can satisfy it. Keep writes disabled (dry_run) until a relayed join shows the expected "
     "source and claims.",
+    "_forwarding": "Proxy on another machine: set forwarding_secret (or forwarding_secret_file) to the "
+    "secret of Beacon Proxy's player-info forwarding (its forwarding.secret). Then a login is staged "
+    "only when it carries a valid signed claim from Beacon, wherever it comes from, and the local "
+    "source check is not used. beacon_server_name is this server's name in beacon.toml (empty: any).",
     "enabled": True,
     "dry_run": True,
+    "forwarding_secret": "",
+    "forwarding_secret_file": "",
+    "beacon_server_name": "",
+    "claim_window_seconds": 60,
     "require_local_source": True,
     "auto_allow_local_addresses": True,
     "allowed_sources": ["127.0.0.1", "::1"],
@@ -115,6 +124,22 @@ class XuidForward(Plugin):
         self._hook_installed = False
         self._load_config()
         self._local_addresses = self._detect_local_addresses()
+        self._claims = None
+        try:
+            secret = read_secret(
+                str(self._config.get("forwarding_secret", "") or ""),
+                str(self._config.get("forwarding_secret_file", "") or ""),
+            )
+        except OSError as e:
+            secret = b""
+            self.logger.error(f"could not read forwarding_secret_file: {e} - using the local source check")
+        if secret:
+            self._claims = ClaimVerifier(
+                secret,
+                str(self._config.get("beacon_server_name", "") or ""),
+                int(self._config.get("claim_window_seconds", 60) or 60),
+            )
+            self.logger.info("Beacon forwarding secret set: logins are trusted by their signed claim, from any machine")
         self._load_shim()
 
     def on_enable(self) -> None:
@@ -166,10 +191,13 @@ class XuidForward(Plugin):
 
         self.logger.info(f"hook installed. {self._shim.xf_register_contract().decode()}")
         self._hook_installed = True
-        self.logger.info(
-            "accepted login sources: " + ", ".join(sorted(self._local_addresses))
-            + " (the machine's own addresses; the relay's ICE data connection uses one of them)"
-        )
+        if self._claims is not None:
+            self.logger.info("logins are trusted by their Beacon forwarding signature; the source address is not checked")
+        else:
+            self.logger.info(
+                "accepted login sources: " + ", ".join(sorted(self._local_addresses))
+                + " (the machine's own addresses; the relay's ICE data connection uses one of them)"
+            )
         if self._config["dry_run"]:
             self.logger.warning(
                 "DRY RUN - the hook is live and logs what it finds, but no XUID is written. "
@@ -199,7 +227,25 @@ class XuidForward(Plugin):
         except Exception:
             source_host, source_port = "", 0
 
-        if not self._source_allowed(source_host):
+        # The payload is the raw packet body (binary), not JSON - see login_body.py.
+        parsed = parse_login_body(event.payload)
+
+        if self._claims is not None:
+            # A forwarding secret is set: the signed claim decides, not the source address, so
+            # the proxy may run on another machine.
+            ok, reason = (False, "could not parse the login body")
+            if parsed:
+                ok, reason = self._claims.verify(
+                    parsed["beacon_claim"], parsed["client_key"], parsed["xuid"], parsed["xname"]
+                )
+            if not ok:
+                self._clear_outside_login(event.payload)
+                if parsed and is_self_signed(parsed):
+                    self.logger.warning(
+                        f"login {parsed['xname']!r} from {source_host}:{source_port} not staged: {reason}"
+                    )
+                return
+        elif not self._source_allowed(source_host):
             # BDS is about to process this login, and the hook matches staged identities by the
             # name BDS builds. Clear the entry this outside login could pick up, so it can never
             # be handed an identity staged for a relayed player - e.g. one whose join failed
@@ -208,9 +254,6 @@ class XuidForward(Plugin):
             self._clear_outside_login(event.payload)
             self._log_rejected_source(source_host, source_port, event.payload)
             return
-
-        # The payload is the raw packet body (binary), not JSON - see login_body.py.
-        parsed = parse_login_body(event.payload)
         if not parsed:
             self.logger.warning(
                 f"login from {source_host}:{source_port}: could not parse the login body "
