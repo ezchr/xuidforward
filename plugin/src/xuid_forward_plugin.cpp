@@ -229,8 +229,8 @@ void XuidForwardPlugin::writeDefaultConfig(const std::string &path) const
   "enabled": true,
   "dry_run": true,
   "namespace_uuid": "a3e78ee7-823a-4cb5-9fe0-532b54ccc20d",
-  "_namespace_uuid_comment": "Must match selfSignedIDNamespace in the relay (n2rpush/proxy/self_signed_id.go). A login is only trusted when SelfSignedId == uuid5(namespace_uuid, XUID).",
-  "require_self_signed_id_match": true,
+  "_namespace_uuid_comment": "Used only by require_self_signed_id_match: a login is then only trusted when SelfSignedId == uuid5(namespace_uuid, XUID), as Beacon Proxy derives it. Off by default; other proxies such as WaterdogPE do not derive it.",
+  "require_self_signed_id_match": false,
   "require_digit_xuid": true,
   "stage_ttl_seconds": 30,
   "profile": ""

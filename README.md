@@ -78,8 +78,10 @@ login, and it guards that write so it can't be turned against a player:
 - **Verified name only.** Staging is keyed on the name from the login chain, never on a field the
   client writes for itself.
 - **Short-lived, single-use.** Staged identities are consumed on use and expire in seconds.
-- `SelfSignedId == uuid5(namespace, XUID)` is checked as a **consistency** signal, not
-  authentication — the namespace and derivation are both public.
+- **Optional SelfSignedId check.** `require_self_signed_id_match` (off by default) also requires
+  `SelfSignedId == uuid5(namespace, XUID)`, which is how Beacon Proxy fills it in. Other proxies,
+  such as WaterdogPE, pass the client's own `SelfSignedId`, so leave it off for them. It is a
+  consistency signal, not authentication: the namespace and derivation are both public.
 
 `online-mode=false` is required for BDS to accept the proxy's self-signed login, and that's fine:
 this plugin does not weaken it. BDS still resolves a genuine Xbox login (for example someone
@@ -139,8 +141,8 @@ behaviour until you supply an updated profile.
 ## Proxy on another machine
 
 By default xuidforward only trusts logins that come from the BDS machine itself, so the proxy has
-to run there. To run the proxy elsewhere, use one that signs its logins: Beacon Proxy does, with
-`player-info-forwarding-mode = "beacon"` (its claim format is in Beacon's `docs/forwarding.md`).
+to run there. To run the proxy elsewhere, use one that signs its logins: Beacon Proxy signs every
+login it sends (its claim format is in Beacon's `docs/forwarding.md`).
 
 In `plugins/xuidforward/config.json`:
 

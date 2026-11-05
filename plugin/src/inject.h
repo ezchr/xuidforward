@@ -22,7 +22,7 @@ struct InjectConfig {
     Profile profile;
     bool enabled{true};
     bool dry_run{true};
-    bool require_self_signed_id_match{true};
+    bool require_self_signed_id_match{false};
     bool require_digit_xuid{true};
     int stage_ttl_seconds{30};
     std::array<std::uint8_t, 16> namespace_uuid{};

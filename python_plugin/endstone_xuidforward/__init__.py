@@ -56,10 +56,12 @@ DEFAULT_CONFIG = {
     "connection shows up as one of the host's own addresses even though its signalling hop is "
     "loopback. auto_allow_local_addresses keeps that list current; allowed_sources adds explicit "
     "entries. This is the relay's own trust model ('only safe when the listener cannot be reached "
-    "directly') made explicit. (2) require_self_signed_id_match is only a consistency check, NOT "
-    "authentication: the namespace and the uuid5 derivation are public, so anyone who can reach the "
-    "handler can satisfy it. Keep writes disabled (dry_run) until a relayed join shows the expected "
-    "source and claims.",
+    "directly') made explicit. (2) require_self_signed_id_match (off by default) also requires "
+    "SelfSignedId == uuid5(namespace_uuid, XUID), which only Beacon Proxy's logins carry; other "
+    "proxies such as WaterdogPE pass the client's own SelfSignedId and would be refused. It is a "
+    "consistency check, NOT authentication: the namespace and the uuid5 derivation are public, so "
+    "anyone who can reach the handler can satisfy it. Keep writes disabled (dry_run) until a relayed "
+    "join shows the expected source and claims.",
     "_forwarding": "Proxy on another machine: set forwarding_secret (or forwarding_secret_file) to the "
     "secret of Beacon Proxy's player-info forwarding (its forwarding.secret). Then a login is staged "
     "only when it carries a valid signed claim from Beacon, wherever it comes from, and the local "
@@ -74,7 +76,7 @@ DEFAULT_CONFIG = {
     "auto_allow_local_addresses": True,
     "allowed_sources": ["127.0.0.1", "::1"],
     "namespace_uuid": DEFAULT_NAMESPACE,
-    "require_self_signed_id_match": True,
+    "require_self_signed_id_match": False,
     "require_digit_xuid": True,
     # The hook consumes a stage within milliseconds of the login packet; anything older
     # belongs to a login that failed, and must not wait around for another login.
