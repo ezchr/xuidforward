@@ -417,7 +417,8 @@ class XuidForward(Plugin):
 
         self.logger.warning(
             f"login from {host or '<unknown>'}:{port} rejected: not an address of this machine"
-            f"{detail}; that login was left completely untouched"
+            f"{detail}; that login was left completely untouched. A proxy in its own container "
+            f"comes from the container's address: add it to allowed_sources (see the README)"
         )
 
     # -- helpers ------------------------------------------------------------

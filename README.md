@@ -102,6 +102,12 @@ The [latest release](../../releases/latest) has both files prebuilt, plus `INSTA
 `SHA256SUMS`. If your BDS is 1.26.60.6 or 1.26.51.1, Linux x86-64, use these — no compiler needed.
 The profiles for both builds ship inside the wheel, so no `profile.json` is needed.
 
+**Proxy in its own container.** A login then comes from the container's bridge address (such as
+`172.17.0.2`), not an address of the BDS machine, so it is refused with "not an address of this
+machine". Add that address to `allowed_sources` in `plugins/xuidforward/config.json`. This trusts
+every container on that bridge to present a login, so use a network only the proxy is on, or give
+the proxy a fixed address. With Beacon Proxy, use `forwarding_secret_file` instead.
+
 The `.so` links against libc++. If it doesn't load (for example in the `endstone/endstone` Docker
 image, where `ldd` reports them missing), install `libc++1`, `libc++abi1` and `libunwind-14`.
 
