@@ -1,0 +1,17 @@
+{
+  "bds_version": "1.26.65.1",
+  "executable_size": 265503224,
+  "site_signature": "E8 ?? ?? ?? ?? 48 8D 9C 24 ?? ?? 00 00 C6 84 24 ?? ?? 00 00 00 C6 84 24 ?? ?? 00 00 00 41 80 7C 24 60 01 75 13 48 89 DF 4C 89 E6 E8 ?? ?? ?? ??",
+  "expected_site_bytes": "E8 C5 44 74 FE 48 8D 9C 24 E8 02 00 00 C6 84 24 E8 02 00 00 00 C6 84 24 48 03 00 00 00 41 80 7C 24 60 01 75 13 48 89 DF 4C 89 E6 E8 8A E0 1D FE",
+  "site_rva": "0x8cc3806",
+  "helper_rva": "0x7407cd0",
+  "offset_xuid": 0,
+  "offset_xbox_live_name": 144,
+  "offset_engaged": 296,
+  "offset_string_size": 24,
+  "_what": "Same call site as 1.26.60.6 (ServerNetworkHandler::_processValidatedLoginPacket, the PlayerAuthenticationInfo copy constructor call), moved by 0x4e0 in 1.26.65.1.",
+  "_register_contract": "rbx = PlayerAuthenticationInfo& (source of the copy, rsi at the call site), r12 = optional<MessToken>&, rbp = this (ServerNetworkHandler), r13 = NetworkIdentifier, r14 = shared_ptr<LoginPacket>.",
+  "_derived_by": "The 1.26.60.6 site signature matched once in the 1.26.65.1 Linux binary; the site bytes are identical and the helper first 256 bytes are identical to 1.26.60.6 helper, so the PlayerAuthenticationInfo layout and offsets are unchanged.",
+  "_note": "Verify with the xuidforward profile tool against this server's bedrock_server binary.",
+  "result_register": "rdi"
+}

@@ -20,6 +20,11 @@
 // XUIDs are 16-17 digits, so a replacement always lands in the short-string
 // buffer: no allocation, no free, nothing that can interact with BDS's heap.
 #pragma once
+// Shared guard so the Windows build (which force-includes windows/abi_string.h first) does not
+// also pull this libc++ version in through inject.h's quoted include. On Linux this behaves
+// exactly like the #pragma once above.
+#ifndef XUIDFORWARD_ABI_STRING_H
+#define XUIDFORWARD_ABI_STRING_H
 
 #include <cstdint>
 #include <cstdio>
@@ -322,3 +327,5 @@ struct StringLayout {
 };
 
 }  // namespace xuidforward
+
+#endif  // XUIDFORWARD_ABI_STRING_H

@@ -444,13 +444,20 @@ class XuidForward(Plugin):
             self.logger.warning(f"could not read {path}: {error}; using defaults")
 
     def _load_shim(self) -> None:
+        import sys
+
+        # The native library is bundled inside the wheel (endstone_xuidforward/native/), so a
+        # single pip/wheel install carries it - no separate shim file to place. Pick the build
+        # for this OS; fall back to a couple of legacy locations for an externally placed shim.
+        libname = "libxuidforward.dll" if sys.platform == "win32" else "libxuidforward.so"
+        native = Path(__file__).parent / "native" / libname
         candidates = []
         if self._config.get("shim_path"):
             candidates.append(self._config["shim_path"])
         candidates += [
-            str(self.data_folder / "libxuidforward.so"),
-            str(self.data_folder.parent / "libxuidforward.so"),
-            "/root/bedrock/plugins/xuidforward/libxuidforward.so",
+            str(native),
+            str(self.data_folder / libname),
+            str(self.data_folder.parent / libname),
         ]
         # Deliberately NOT falling back to a build tree (e.g. /root/xuidfix/build): a production
         # server must never silently load a half-finished .so left over from a rebuild. Point
@@ -481,4 +488,4 @@ class XuidForward(Plugin):
             self._shim = library
             self.logger.info(f"shim loaded: {candidate} ({library.xf_version().decode()})")
             return
-        self.logger.error("libxuidforward.so not found (looked in: " + ", ".join(candidates) + ")")
+        self.logger.error(f"{libname} not found (looked in: " + ", ".join(candidates) + ")")

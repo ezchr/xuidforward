@@ -1,0 +1,18 @@
+{
+  "bds_version": "1.26.65.1",
+  "executable_size": 232650056,
+  "site_signature": "E8 ?? ?? ?? ?? 90 48 8B 95 D0 06 00 00 4C 8D BD C0 04 00 00 C6 85 40 05 00 00 00 80 BA 80 00 00 00 01 75 10",
+  "expected_site_bytes": "E8 7B EC FF FF 90 48 8B 95 D0 06 00 00 4C 8D BD C0 04 00 00 C6 85 40 05 00 00 00 80 BA 80 00 00 00 01 75 10",
+  "site_rva": "0xb89550",
+  "helper_rva": "0xb881d0",
+  "offset_xuid": 0,
+  "offset_xbox_live_name": 192,
+  "offset_engaged": 0,
+  "offset_string_size": 32,
+  "result_register": "r14",
+  "_what": "ServerNetworkHandler::_processValidatedLoginPacket - the PlayerAuthenticationInfo copy-constructor call at 0xb89550 (helper 0xb881d0). It builds the PlayerAuthenticationInfo BDS then hands to player creation, at the destination held in r14 (lea r14,[rbp+0x340] right before the call; r14 is callee-saved, so it still points at the copy when the call returns). The copy is a plain PlayerAuthenticationInfo with no engaged flag, so offset_engaged is unused.",
+  "_register_contract": "At the call: rcx = &copy (destination, = r14), rdx = rdi = const PlayerAuthenticationInfo& (the source, the function's 4th parameter homed from r9), r14 = &copy held across. result_register r14 = the copy the hook reads and rewrites.",
+  "_abi": "MSVC x86-64. std::string is 32 bytes (data+0, size+16, capacity+24; small-string buffer holds 15 chars). BDS dynamically links msvcp140.dll/vcruntime140.dll/UCRT, so the shim (built /MD) shares the same std::string ABI and heap: the XUID is written with the real std::string::assign, which allocates when it does not fit the 15-char buffer.",
+  "_derived_by": "Located by the unique code reference to the function's own signature string in bedrock_server.exe 1.26.65.1; field offsets from the copy constructor's per-member std::string layout (xuid is string member 0, xbox_live_name is string member 6 = 0xC0), cross-checked against the 1.26.65.1 Linux profile (xuid 0, xbox_live_name 144 = 6*24). Signature is unique (1 match) over the executable sections; the call's rel32 derives helper 0xb881d0.",
+  "_note": "Windows BDS + Endstone 0.11.16."
+}

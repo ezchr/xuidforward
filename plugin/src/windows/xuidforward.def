@@ -1,0 +1,14 @@
+LIBRARY libxuidforward
+EXPORTS
+    xf_version
+    xf_register_contract
+    xf_last_error
+    xf_set_namespace
+    xf_layout_probe
+    xf_self_check
+    xf_install
+    xf_uninstall
+    xf_stage
+    xf_clear_stage
+    xf_clear_stage_name
+    xf_status
