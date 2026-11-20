@@ -42,7 +42,7 @@ The plugin has two halves:
 1. **Python plugin** (`python_plugin/endstone_xuidforward`) — uses Endstone's public
    `PacketReceiveEvent` to read the incoming Login packet, pull the real XUID and name out of the
    login chain, and *stage* that identity for the login about to be validated.
-2. **Native shim** (`plugin/`, `shim/`) — a small `.so` loaded into the BDS process via `ctypes`.
+2. **Native shim** (`plugin/`, `shim/`) — a small native library (`.so` on Linux, `.dll` on Windows) loaded into the BDS process via `ctypes`.
    It patches a single call in BDS's login path and, for a login whose XUID field BDS left empty,
    writes the staged real XUID into `PlayerAuthenticationInfo` before player storage is selected.
    Endstone ships no C++ SDK artifact, which is why the native part is a standalone shim rather
