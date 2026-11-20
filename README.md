@@ -4,8 +4,8 @@ An [Endstone](https://github.com/EndstoneMC/endstone) plugin that makes a Bedroc
 Server keep the real XUID from a self-signed (offline) login, so players who reach the server
 through a proxy get their own persistent player record instead of a fresh, empty one every join.
 
-> **Supports BDS 1.26.60.6 (protocol 2225, Endstone 0.11.15) and 1.26.51.1 (protocol 2193),
-> Linux x86-64.** The plugin picks the profile that matches your BDS build by itself. It locates its
+> **Supports BDS 1.26.65.1 (Endstone 0.11.16) on both Linux x86-64 and Windows x64**, plus
+> 1.26.60.6 and 1.26.51.1 on Linux. One wheel works on both systems. The plugin picks the profile that matches your BDS build by itself. It locates its
 > patch site by signature, so it also installs on later builds that only shifted addresses; it
 > refuses to patch if it can't find the site uniquely. See [Status](#status).
 >
@@ -92,15 +92,29 @@ another player's saved data or permissions, which BDS keys on the XUID.
 
 ## Installing
 
-Two files end up on your server: the Python plugin wheel and the native `libxuidforward.so`.
-Everything below runs on the Linux BDS machine — the `.so` is Linux x86-64 and can't be built or
-run on Windows.
+One file: the plugin wheel. It works on **Linux and Windows** — the native library for both
+(`libxuidforward.so` / `libxuidforward.dll`) and the profiles for every supported BDS build are
+inside it, and the plugin loads the right one by itself.
 
-### Option A — prebuilt release (BDS 1.26.60.6 or 1.26.51.1)
+### Option A — prebuilt release
 
-The [latest release](../../releases/latest) has both files prebuilt, plus `INSTALL.txt` and
-`SHA256SUMS`. If your BDS is 1.26.60.6 or 1.26.51.1, Linux x86-64, use these — no compiler needed.
-The profiles for both builds ship inside the wheel, so no `profile.json` is needed.
+Supported out of the box:
+
+| BDS | Linux x86-64 | Windows x64 |
+|---|---|---|
+| 1.26.65.1 (Endstone 0.11.16) | yes | yes |
+| 1.26.60.6 | yes | — |
+| 1.26.51.1 | yes | — |
+
+1. Download `endstone_xuidforward-<version>-py3-none-any.whl` from the
+   [latest release](../../releases/latest) (check it against `SHA256SUMS` if you like).
+2. Put it into your server's `plugins/` folder (the same folder Endstone already loads plugins
+   from), or `pip install` it into the Python environment Endstone runs in.
+3. Restart BDS **fully** — not `/reload`; the native patch can't reinstall into a running server.
+
+**Linux only:** the `.so` links against libc++. If it doesn't load (for example in the
+`endstone/endstone` Docker image, where `ldd` reports them missing), install `libc++1`,
+`libc++abi1` and `libunwind-14`. On Windows nothing extra is needed.
 
 **Proxy in its own container.** A login then comes from the container's bridge address (such as
 `172.17.0.2`), not an address of the BDS machine, so it is refused with "not an address of this
@@ -108,23 +122,22 @@ machine". Add that address to `allowed_sources` in `plugins/xuidforward/config.j
 every container on that bridge to present a login, so use a network only the proxy is on, or give
 the proxy a fixed address. With Beacon Proxy, use `forwarding_secret_file` instead.
 
-The `.so` links against libc++. If it doesn't load (for example in the `endstone/endstone` Docker
-image, where `ldd` reports them missing), install `libc++1`, `libc++abi1` and `libunwind-14`.
-
-1. Put `endstone_xuidforward-<version>-py3-none-any.whl` into your server's `plugins/` folder
-   (the same folder Endstone already loads plugins from).
-2. Create `plugins/xuidforward/` and put `libxuidforward.so` inside it.
-3. Restart BDS **fully** — not `/reload`; the native patch can't reinstall into a running server.
-
 ### Option B — build from source (any target, and the only way for a different BDS build)
 
+Linux (needs `clang++-18` and libc++ dev headers):
+
 ```sh
-scripts/build-shim.sh                                        # builds build/libxuidforward.so, runs the tests
-python -m pip wheel --no-deps -w build/wheel python_plugin   # builds the plugin wheel
+scripts/build-shim.sh        # builds build/libxuidforward.so, runs the tests
 ```
 
-Needs `clang++-18` and libc++ dev headers. Then place the files and restart exactly as in steps
-1–3 above. For a BDS build other than the supported ones you also need a matching profile: derive
+Windows (needs Visual Studio with the C++ workload):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scriptsuild-shim.ps1   # builds build\libxuidforward.dll
+```
+
+Copy the built library into `python_plugin/endstone_xuidforward/native/`, then build the wheel with
+`python -m pip wheel --no-deps -w build/wheel python_plugin` and install it as in Option A. For a BDS build other than the supported ones you also need a matching profile: derive
 one (see `plugin/tools/verify.cpp` and `tools/elfscan.py`), drop it into `plugins/xuidforward/` as
 `profile.json`. A `profile.json` there always takes precedence over the bundled profiles.
 
@@ -133,7 +146,7 @@ one (see `plugin/tools/verify.cpp` and `tools/elfscan.py`), drop it into `plugin
 The BDS console on startup should show:
 
 ```
-[Xuidforward] profile self-check (.../profiles/1.26.60.6-linux-x86_64.json): profile valid: BDS 1.26.60.6 (signature -> site 0x..., helper 0x...)
+[Xuidforward] profile self-check (.../profiles/1.26.65.1-linux-x86_64.json): profile valid: BDS 1.26.65.1 (signature -> site 0x..., helper 0x...)
 [Xuidforward] hook installed.
 ```
 
@@ -173,6 +186,9 @@ Still keep BDS reachable only by the proxy if you can: with `online-mode=false`,
 it can join, just without anyone's XUID.
 
 ## Status
+
+**1.26.65.1:** supported on Linux and Windows (Endstone 0.11.16). The Windows build was tested on a
+live Windows BDS 1.26.65.1: the profile matches and the hook installs and uninstalls cleanly.
 
 Validated against BDS 1.26.60.6 (protocol 2225, Endstone 0.11.15) and 1.26.51.1 (protocol 2193):
 a relayed self-signed login registers under the player's real XUID and their data persists across
