@@ -1,6 +1,7 @@
 # Build output
 build/
 *.so
+*.dll
 *.o
 *.whl
 
